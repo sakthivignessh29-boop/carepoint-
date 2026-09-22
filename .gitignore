@@ -1,0 +1,19 @@
+# Node / React
+node_modules/
+dist/
+build/
+.vite/
+*.log
+
+# .NET / C#
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+appsettings.Development.json
+
+# Environment & OS
+.DS_Store
+.env
+.env.local
