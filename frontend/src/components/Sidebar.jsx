@@ -15,15 +15,16 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ activeTab, setActiveTab, onOpenAiChat }) {
   const { user, logout } = useAuth();
+  const isAdminOrStaff = user?.role === 'Admin' || user?.role === 'Staff';
 
   const navItems = [
     { id: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard },
-    { id: 'patients', label: 'Patient Intake & Directory', icon: Users },
+    ...(isAdminOrStaff ? [{ id: 'patients', label: 'Patient Intake Directory', icon: Users }] : []),
     { id: 'resources', label: 'Hospitality & Equipment', icon: BedDouble },
-    { id: 'calendar', label: 'Resource Scheduling', icon: CalendarDays },
+    { id: 'calendar', label: 'Slot Booking & Calendar', icon: CalendarDays },
     { id: 'feedback', label: 'Feedback & Attender Portal', icon: Star },
     { id: 'queries', label: 'Queries Desk & FAQ', icon: HelpCircle },
-    { id: 'concurrency', label: 'Concurrency & Audit Logs', icon: ShieldAlert },
+    ...(isAdminOrStaff ? [{ id: 'concurrency', label: 'Concurrency Audit Logs', icon: ShieldAlert }] : []),
   ];
 
   return (

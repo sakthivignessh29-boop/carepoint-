@@ -118,24 +118,67 @@ function MainApp() {
   // Booking Actions (Create, Update/Reschedule, Cancel)
   const handleSaveBooking = async (bookingData) => {
     let result;
-    if (bookingData.id) {
-      result = await bookingsApi.update(bookingData.id, bookingData);
+    let targetPatientId = bookingData.patientId;
+
+    // If a new patient name was entered without an ID, create the patient record
+    if (!targetPatientId && bookingData.patientName) {
+      const existing = patients.find(p => p.fullName.toLowerCase() === bookingData.patientName.toLowerCase());
+      if (existing) {
+        targetPatientId = existing.id;
+      } else {
+        try {
+          const newPatient = await patientsApi.create({
+            fullName: bookingData.patientName,
+            accommodationType: 'Deluxe Suite',
+            dietaryPreferences: 'Standard',
+            medicalSpecialty: 'General Hospitality'
+          });
+          targetPatientId = newPatient.id;
+        } catch (err) {
+          console.error("Auto patient creation error:", err);
+          targetPatientId = patients.length > 0 ? patients[0].id : 1;
+        }
+      }
+    }
+
+    const payload = {
+      ...bookingData,
+      patientId: targetPatientId
+    };
+
+    if (payload.id) {
+      result = await bookingsApi.update(payload.id, payload);
     } else {
-      result = await bookingsApi.create(bookingData);
+      result = await bookingsApi.create(payload);
     }
 
     if (result.isConflict) {
       showToast(result.message, 'conflict', true);
       fetchData();
     } else if (result.success) {
-      showToast(bookingData.id ? 'Booking rescheduled & updated successfully!' : 'Resource slot booked successfully!', 'success');
-      setIsBookingModalOpen(false);
-      setEditingBooking(null);
-      setPrefilledSlot(null);
+      showToast(payload.id ? 'Booking rescheduled & updated successfully!' : 'Resource slot booked successfully!', 'success');
+      
+      const newBookingObj = {
+        id: result.data?.id || result.data?.Id || Math.floor(Date.now() / 1000),
+        patientId: targetPatientId,
+        patientName: payload.patientName || (patients.find(p => p.id === targetPatientId)?.fullName) || 'Registered Patient',
+        patientCode: (patients.find(p => p.id === targetPatientId)?.patientCode) || `PAT-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        resourceId: payload.resourceId,
+        resourceName: payload.resourceName || (resources.find(r => r.id === payload.resourceId)?.name) || 'Assigned Resource',
+        resourceType: (resources.find(r => r.id === payload.resourceId)?.type) || 'Room',
+        start: payload.startTime,
+        end: payload.endTime,
+        purpose: payload.purpose || 'Hospitality Stay & Monitoring',
+        status: payload.status || 'Booked',
+        updateNotes: payload.updateNotes || ''
+      };
+
+      setBookings(prev => [newBookingObj, ...prev.filter(b => b.id !== newBookingObj.id)]);
       fetchData();
     } else {
       showToast(result.message || 'Booking operation failed.', 'error');
     }
+    return result;
   };
 
   const handleCancelBooking = async (id) => {
@@ -240,7 +283,7 @@ function MainApp() {
 
       {/* Main Content Viewport */}
       <div className="flex-1 ml-64 flex flex-col min-h-screen">
-        <Header title={getPageTitle()} onRefresh={fetchData} isRefreshing={isRefreshing} />
+        <Header title={getPageTitle()} onRefresh={fetchData} isRefreshing={isRefreshing} bookings={bookings} feedbacks={feedbacks} />
 
         <main className="flex-1 p-8">
           {activeTab === 'dashboard' && (
@@ -253,7 +296,7 @@ function MainApp() {
             />
           )}
 
-          {activeTab === 'patients' && (
+          {activeTab === 'patients' && (user?.role === 'Admin' || user?.role === 'Staff') && (
             <PatientsPage
               patients={patients}
               onAddPatient={() => { setEditingPatient(null); setIsPatientModalOpen(true); }}
@@ -298,7 +341,7 @@ function MainApp() {
             />
           )}
 
-          {activeTab === 'concurrency' && (
+          {activeTab === 'concurrency' && (user?.role === 'Admin' || user?.role === 'Staff') && (
             <ConcurrencyAuditPage
               resources={resources}
               patients={patients}

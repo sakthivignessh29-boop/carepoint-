@@ -32,7 +32,7 @@ namespace HospitalityApi.Services
                 return (false, false, "Start time must be strictly before End time.", null);
             }
 
-            if (dto.StartTime < DateTime.UtcNow.AddMinutes(-5))
+            if (dto.StartTime.ToUniversalTime() < DateTime.UtcNow.AddHours(-12))
             {
                 return (false, false, "Cannot book slots in the past.", null);
             }

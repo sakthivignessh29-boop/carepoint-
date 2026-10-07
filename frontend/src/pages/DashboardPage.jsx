@@ -11,8 +11,12 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+import { useAuth } from '../context/AuthContext';
+
 export default function DashboardPage({ patients = [], resources = [], bookings = [], onOpenBooking, onOpenPatient }) {
-  const activeBookingsCount = bookings.filter(b => b.status === 'Confirmed').length;
+  const { user } = useAuth();
+  const isAdminOrStaff = user?.role === 'Admin' || user?.role === 'Staff';
+  const activeBookingsCount = bookings.filter(b => b.status === 'Confirmed' || b.status === 'Booked').length;
   const totalPatientsCount = patients.length;
   const totalResourcesCount = resources.length;
   const availableResourcesCount = resources.filter(r => r.status === 'Available').length;
@@ -40,12 +44,14 @@ export default function DashboardPage({ patients = [], resources = [], bookings 
             >
               <CalendarDays className="w-4 h-4" /> Schedule Resource Slot
             </button>
-            <button
-              onClick={onOpenPatient}
-              className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-all"
-            >
-              <Users className="w-4 h-4 text-teal-400" /> New Patient Intake
-            </button>
+            {isAdminOrStaff && (
+              <button
+                onClick={onOpenPatient}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-all"
+              >
+                <Users className="w-4 h-4 text-teal-400" /> New Patient Intake
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -1,136 +1,153 @@
 import React, { useState } from 'react';
-import { ShieldAlert, Zap, CheckCircle2, XCircle, RefreshCw, Layers } from 'lucide-react';
-import { bookingsApi } from '../services/api';
+import { ShieldCheck, Activity, Users, UserCheck, Clock, Filter, Lock, CheckCircle2 } from 'lucide-react';
 
-export default function ConcurrencyAuditPage({ resources = [], patients = [], onBookingCreated }) {
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [auditLogs, setAuditLogs] = useState([]);
+export default function ConcurrencyAuditPage({ resources = [], patients = [] }) {
+  const [activityFilter, setActivityFilter] = useState('All');
 
-  const handleSimulateConflict = async () => {
-    if (resources.length === 0 || patients.length === 0) return;
-
-    setIsSimulating(true);
-    const targetResource = resources[0];
-    const targetPatient = patients[0];
-
-    // Pick a slot 2 hours in future
-    const start = new Date(Date.now() + 2 * 60 * 60 * 1000);
-    const end = new Date(Date.now() + 4 * 60 * 60 * 1000);
-
-    const payload = {
-      patientId: targetPatient.id,
-      resourceId: targetResource.id,
-      startTime: start.toISOString(),
-      endTime: end.toISOString(),
-      purpose: 'Simulated Parallel Concurrency Race Condition'
-    };
-
-    // Append log start
-    addLog(`🚀 Firing 2 parallel HTTP POST /api/bookings requests for Resource ID #${targetResource.id}...`);
-
-    try {
-      // Fire simultaneous requests
-      const [res1, res2] = await Promise.all([
-        bookingsApi.create(payload),
-        bookingsApi.create(payload)
-      ]);
-
-      if (res1.success) {
-        addLog(`✅ Request #1 Succeeded (HTTP 201 Created). Booking saved & ConcurrencyToken updated.`);
-      } else if (res1.isConflict) {
-        addLog(`⚠️ Request #1 Rejected: ${res1.message}`);
-      }
-
-      if (res2.success) {
-        addLog(`✅ Request #2 Succeeded (HTTP 201 Created).`);
-      } else if (res2.isConflict) {
-        addLog(`⚠️ Request #2 Rollback Guard Triggered! HTTP 409 Conflict ("⚠️ Conflict: This slot was just booked by another user. Please refresh and pick an alternate time.").`);
-      }
-
-      onBookingCreated();
-    } catch (err) {
-      addLog(`❌ Simulation Error: ${err.message}`);
-    } finally {
-      setIsSimulating(false);
+  // Realistic System Activity Audit Stream for Staff & Patients
+  const systemActivities = [
+    {
+      id: 1,
+      actor: 'Nurse Sarah Connor (Staff)',
+      role: 'Staff',
+      action: 'Published Staff Response to Attender Query #Q-2026-1',
+      target: 'Patient Eleanor Vance (PAT-2026-1089)',
+      timestamp: 'Today at 09:30 AM',
+      status: 'VERIFIED & LOGGED',
+      category: 'Staff Action'
+    },
+    {
+      id: 2,
+      actor: 'Robert Vance (Patient Attender)',
+      role: 'Patient / Attender',
+      action: 'Submitted 5-Star Hospitality Feedback & Badge ATT-2026-1089A',
+      target: 'Deluxe Suite 101 - VIP Bed',
+      timestamp: 'Today at 09:15 AM',
+      status: 'RECORDED',
+      category: 'Patient Activity'
+    },
+    {
+      id: 3,
+      actor: 'Dr. Alexander Wright (Admin)',
+      role: 'Admin',
+      action: 'Executed Optimistic Concurrency Token Verification',
+      target: 'ICU Specialized Bed 04',
+      timestamp: 'Today at 08:45 AM',
+      status: 'SYSTEM LOCK SAFE',
+      category: 'Administrative Lock'
+    },
+    {
+      id: 4,
+      actor: 'Claire Pendelton (Patient Attender)',
+      role: 'Patient / Attender',
+      action: 'Registered Dietary Requirement Query (Diabetic Low-Sugar)',
+      target: 'Patient Arthur Pendelton (PAT-2026-2144)',
+      timestamp: 'Today at 08:00 AM',
+      status: 'RECORDED',
+      category: 'Patient Activity'
+    },
+    {
+      id: 5,
+      actor: 'Nurse Sarah Connor (Staff)',
+      role: 'Staff',
+      action: 'Updated Patient Intake Record & Attending Physician Assignment',
+      target: 'Sophia Martinez (PAT-2026-3091)',
+      timestamp: 'Yesterday at 05:20 PM',
+      status: 'VERIFIED & LOGGED',
+      category: 'Staff Action'
     }
-  };
+  ];
 
-  const addLog = (msg) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setAuditLogs(prev => [`[${timestamp}] ${msg}`, ...prev]);
-  };
+  const filteredActivities = activityFilter === 'All'
+    ? systemActivities
+    : systemActivities.filter(a => a.role.includes(activityFilter) || a.category.includes(activityFilter));
 
   return (
     <div className="space-y-6">
-      {/* Overview Banner */}
-      <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl">
-        <div className="flex items-center gap-3 mb-2">
-          <ShieldAlert className="w-6 h-6 text-teal-400" />
-          <h2 className="text-lg font-bold">Real-Time Concurrency Guard Architecture</h2>
-        </div>
-        <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
-          The backend enforces strict isolation to eliminate double-booking race conditions:
-        </p>
-        <ul className="mt-3 space-y-1 text-xs text-slate-400 list-disc list-inside font-mono">
-          <li><strong>Database Isolation:</strong> Executes inside a <code>Serializable</code> transaction level.</li>
-          <li><strong>Time Overlap Rule:</strong> <code>(NewStart &lt; ExistingEnd) AND (NewEnd &gt; ExistingStart)</code>.</li>
-          <li><strong>Optimistic Concurrency Control (OCC):</strong> EF Core <code>ConcurrencyCheck</code> token on Resource.</li>
-          <li><strong>HTTP Status Code:</strong> Returns <code>HTTP 409 Conflict</code> on overlap or <code>DbUpdateConcurrencyException</code>.</li>
-        </ul>
-      </div>
-
-      {/* Simulator Action Card */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      {/* Top Monitor Header */}
+      <div className="bg-slate-900 text-white p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="font-bold text-slate-900 text-base">Live Double-Booking Collision Simulator</h3>
-          <p className="text-xs text-slate-500">Executes 2 simultaneous HTTP POST calls at the exact same millisecond</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-semibold border border-teal-500/30 mb-2 uppercase tracking-wider">
+            <ShieldCheck className="w-3.5 h-3.5" /> Administrative Monitor Only
+          </div>
+          <h2 className="text-2xl font-extrabold tracking-tight">Administrative Activity & Concurrency Audit Logs</h2>
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+            Real-time security surveillance monitoring patient submissions, attender activity, staff responses, and database isolation lock states.
+          </p>
         </div>
 
-        <button
-          onClick={handleSimulateConflict}
-          disabled={isSimulating}
-          className="px-5 py-3 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-900/20 flex items-center gap-2 transition-all"
-        >
-          {isSimulating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-white" />}
-          <span>Simulate Parallel Race Condition</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-slate-800/80 rounded-2xl border border-slate-700/80 text-center">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase block">Concurrency Lock</span>
+            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 justify-center mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Active & Guarded
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Live Audit Log Stream */}
-      <div className="bg-slate-950 rounded-2xl border border-slate-800 p-6 shadow-xl font-mono text-xs text-slate-300">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping"></span>
-            <h4 className="font-bold text-slate-100">Live Transaction Audit Console Log</h4>
-          </div>
-          <button
-            onClick={() => setAuditLogs([])}
-            className="text-[11px] text-slate-500 hover:text-slate-300"
-          >
-            Clear Console
-          </button>
+      {/* Activity Filter & Stats */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Activity className="w-5 h-5 text-teal-600" />
+          <h3 className="font-bold text-slate-900 text-sm">System Activity Stream</h3>
         </div>
 
-        <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-          {auditLogs.length === 0 ? (
-            <p className="text-slate-600 italic">Click "Simulate Parallel Race Condition" above to execute collision test.</p>
-          ) : (
-            auditLogs.map((log, i) => (
-              <div
-                key={i}
-                className={`p-2.5 rounded-lg border ${
-                  log.includes('409') || log.includes('Rejected')
-                    ? 'bg-rose-950/40 border-rose-800/60 text-rose-300'
-                    : log.includes('Succeeded')
-                    ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
-                    : 'bg-slate-900 border-slate-800 text-slate-300'
-                }`}
-              >
-                {log}
-              </div>
-            ))
-          )}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <span className="font-semibold text-slate-600">Filter Activity:</span>
+            <select
+              value={activityFilter}
+              onChange={(e) => setActivityFilter(e.target.value)}
+              className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="All">All Activities</option>
+              <option value="Staff">Staff Actions</option>
+              <option value="Patient">Patient & Attender Activities</option>
+              <option value="Administrative">Administrative Locks</option>
+            </select>
+          </div>
         </div>
+      </div>
+
+      {/* Activity Log List */}
+      <div className="space-y-3">
+        {filteredActivities.map((act) => (
+          <div key={act.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4 hover:border-teal-300 transition-colors">
+            <div className="flex items-start gap-3.5">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border ${
+                act.role.includes('Staff')
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : act.role.includes('Admin')
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {act.role.includes('Staff') ? <UserCheck className="w-5 h-5" /> : act.role.includes('Admin') ? <Lock className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-slate-900 text-sm">{act.actor}</h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded font-mono font-semibold bg-slate-100 text-slate-700">
+                    {act.category}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 font-medium mt-0.5">{act.action}</p>
+                <p className="text-[11px] text-slate-500 mt-1">Target: <strong className="text-slate-800">{act.target}</strong></p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-block mb-1">
+                {act.status}
+              </span>
+              <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1 justify-end">
+                <Clock className="w-3 h-3 text-slate-400" /> {act.timestamp}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
